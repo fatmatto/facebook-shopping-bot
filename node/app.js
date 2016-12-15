@@ -57,6 +57,15 @@ if (!(APP_SECRET && VALIDATION_TOKEN && PAGE_ACCESS_TOKEN && SERVER_URL)) {
 }
 
 /*
+*   Marketcloud SDK setup
+*/
+const Marketcloud = require('marketcloud-node');
+var marketcloud = new Marketcloud.Client({
+    public_key : process.env.MC_PUBLIC,
+    secret_key : process.env.MC_SECRET
+});
+
+/*
  * Use your own validation token. Check that the token used in the Webhook 
  * setup is the same token used here.
  *
@@ -255,6 +264,9 @@ function receivedMessage(event) {
     // keywords and send back the corresponding example. Otherwise, just echo
     // the text we received.
     switch (messageText) {
+      case 'list products':
+        sendListOfProducts(senderID);
+      break;
       case 'image':
         sendImageMessage(senderID);
         break;
@@ -402,6 +414,50 @@ function receivedAccountLink(event) {
 
   console.log("Received account link event with for user %d with status %s " +
     "and auth code %s ", senderID, status, authCode);
+}
+
+/*
+* Send a list of products
+*/
+function sendListOfProducts(recipientId) {
+
+  //This is the package for the message
+  var messageData = {
+    recipient: {
+      id: recipientId
+    },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "generic",
+          elements: []
+        }
+      }
+    }
+  };
+
+  //We just retrieve a paginated list of products in our store
+  marketcloud_client.products.list()
+    .then(function(products) {
+
+      //We attach the product to the bot's response
+      products.forEach(product => {
+        messageData.message.attachment.payload.elements.push({
+          title: product.name,
+          subtitle: product.price_discount || product.price,
+          item_url: 'www.example.com/products/'+product.id,
+          image_url: product.images[0],
+          buttons: [{
+              type: "web_url",
+              url: "http://www.example.com/products/"+product.id, //Add your link here
+              title: "View product details"
+            }],
+        })
+      })
+
+      callSendAPI(messageData);
+    })
 }
 
 /*
